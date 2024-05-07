@@ -60,7 +60,7 @@ console.log(ordersList);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "AIzaSyAcuJfhJG5QPujwXyEtVRUMVnoKm-Xuj5k" // Írd át a saját API kulcsodra
+    googleMapsApiKey: "" // Írd át a saját API kulcsodra
   });
 
   const onLoad = useCallback(function callback(map) {
@@ -103,7 +103,6 @@ console.log(ordersList);
 
       <div>
         {ordersList.map(user => (
-          <h1>AAA</h1>
           <div key={user.uuid}>
             <ul>
              <li>{user.phone? user.phone : "Dont have phonenumber"}</li>
