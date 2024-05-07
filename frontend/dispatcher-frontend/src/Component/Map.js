@@ -1,7 +1,8 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { memo } from 'react';
+import { db } from '../config/firebase-config';
+import { getDocs, collection } from "firebase/firestore";
 
 const containerStyle = {
   width: '800px',
@@ -14,54 +15,52 @@ const budapestCenter = {
 };
 
 const Map = () => {
+  const [ordersList, setOrdersList] = useState([]);
   const [taxies, setTaxies] = useState([]);
-  const updateTaxiCoordinates = async (updatedTaxies) => {
-    try {
-      await fetch("https://localhost:7162/taxi/AddTaxi", {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-        updatedTaxies
-        )
-      });
-    } catch (error) {
-      console.error('Error updating taxi coordinates:', error);
-    }
-  };
+  
+  const usersCollectionRef = collection(db, "users");
+
   useEffect(() => {
-    const fetchTaxies = async () => {
+    const getOrdersList = async () => {
       try {
-        const response = await fetch("https://localhost:7162/taxi/GetAllTaxies");
-        if (!response.ok) {
-          throw new Error('Failed to fetch taxies');
-        }
-        const data = await response.json();
-        setTaxies(data);
+        const data = await getDocs(usersCollectionRef);
+        const filteredData = data.docs.map(doc => ({
+          ...doc.data(),
+          name: doc.data().name,
+          phone: doc.data().phone,
+          joined_at: doc.data().joined_at
+        }));
+
+        setOrdersList(filteredData);
+        
       } catch (error) {
-        console.error('Error fetching taxies:', error);
+        console.error(error);
       }
     };
-    updateTaxiesRepeatedly();
-    fetchTaxies();
+    getOrdersList();
+  },[] );
+console.log(ordersList);
+  useEffect(() => {
+    const initialTaxies = generateInitialTaxiPositions();
+    setTaxies(initialTaxies);
   }, []);
-  const updateTaxiesRepeatedly = () => {
-    setInterval(() => {
-      setTaxies(prevTaxies => {
-        const updatedTaxies = prevTaxies.map(taxi => {
-          const newLat = parseFloat(taxi.lat) + 0.001;
-          const newLng = parseFloat(taxi.long) + 0.001;
-          return {...taxi,lat: newLat.toString(), long: newLng.toString()};
-        });
-        updateTaxiCoordinates(updatedTaxies);
-        return updatedTaxies;
+
+  const generateInitialTaxiPositions = () => {
+    const initialTaxies = [];
+    for (let i = 0; i < 10; i++) {
+      initialTaxies.push({
+        id: i,
+        lat: budapestCenter.lat + i * 0.01,
+        long: budapestCenter.lng + i * 0.01,
+        driverName: `Taxi ${i + 1}`
       });
-    }, 10000);
-  
+    }
+    return initialTaxies;
   };
-  
+
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
-    googleMapsApiKey: "AIzaSyAcuJfhJG5QPujwXyEtVRUMVnoKm-Xuj5k"
+    googleMapsApiKey: "AIzaSyAcuJfhJG5QPujwXyEtVRUMVnoKm-Xuj5k" // Írd át a saját API kulcsodra
   });
 
   const onLoad = useCallback(function callback(map) {
@@ -70,36 +69,51 @@ const Map = () => {
   }, []);
 
   return isLoaded ? (
-    <GoogleMap
-      mapContainerStyle={containerStyle}
-      center={budapestCenter}
-      zoom={15}
-      onLoad={onLoad}
-    >
-      {taxies.map((taxi) => {
-        const lat = parseFloat(taxi.lat);
-        const lng = parseFloat(taxi.long);
+    <div>
+      <GoogleMap
+        mapContainerStyle={containerStyle}
+        center={budapestCenter}
+        zoom={15}
+        onLoad={onLoad}
+      >
+        {taxies.map((taxi) => {
+          const lat = parseFloat(taxi.lat);
+          const lng = parseFloat(taxi.long);
 
-        if (isNaN(lat) || isNaN(lng)) {
-          console.warn(`Invalid coordinates for taxi ID ${taxi.id}`);
-          return null;
-        }
+          if (isNaN(lat) || isNaN(lng)) {
+            console.warn(`Invalid coordinates for taxi ID ${taxi.id}`);
+            return null;
+          }
 
-        return (
-          <Marker
-            key={taxi.id}
-            title={taxi.driverName}
-            position={{ lat, lng }}
-            icon={{
-              url: "./taxi.png",
-              scaledSize: new window.google.maps.Size(50, 50),
-              origin: new window.google.maps.Point(0, 0),
-              anchor: new window.google.maps.Point(25, 25)
-            }}
-          />
-        );
-      })}
-    </GoogleMap>
+          return (
+            <Marker
+              key={taxi.id}
+              title={taxi.driverName}
+              position={{ lat, lng }}
+              icon={{
+                url: "./taxi.png",
+                scaledSize: new window.google.maps.Size(50, 50),
+                origin: new window.google.maps.Point(0, 0),
+                anchor: new window.google.maps.Point(25, 25)
+              }}
+            />
+          );
+        })}
+      </GoogleMap>
+
+      <div>
+        {ordersList.map(user => (
+          
+          <div key={user.uuid}>
+            <ul>
+             <li>{user.phone? user.phone : "Dont have phonenumber"}</li>
+            <li>{user.uuid}</li>
+            <li>{user.joined_at}</li>
+          </ul>
+          </div>
+        ))}
+      </div>
+    </div>
   ) : (
     <div>Loading map...</div>
   );
